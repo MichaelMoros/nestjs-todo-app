@@ -5,16 +5,13 @@ export class DateRangeValidator implements ValidatorConstraintInterface {
 	validate(start: Date, args: ValidationArguments): boolean {
 		const end = args.object[args.constraints[0]];
 
-		// FIX ME: HANDLE CUSTOM DATE
 		const parsedStart = new Date(start);
 		const parsedEnd = new Date(end);
 
-		// Check if both dates are valid Date objects
 		if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
 			return false;
 		}
 
-		// Check if end is greater than or equal to start
 		return parsedEnd < parsedStart;
 	}
 

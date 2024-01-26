@@ -17,7 +17,6 @@ export class RefreshTokenGuard implements CanActivate {
 		const request = context.switchToHttp().getRequest()
 		const refreshToken = request.cookies['refreshToken']
 
-		console.log({ refreshToken }, "from guard")
 		if (!refreshToken) throw new UnauthorizedException()
 
 		try {
@@ -27,7 +26,6 @@ export class RefreshTokenGuard implements CanActivate {
 			)
 			request[REQUEST_USER_KEY] = payload
 		} catch (err) {
-			console.log(err)
 			throw new UnauthorizedException()
 		}
 

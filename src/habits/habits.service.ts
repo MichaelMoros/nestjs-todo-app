@@ -10,6 +10,7 @@ import { AwsService } from 'src/aws/aws.service';
 import { RoutineStatus } from './enums/routine-status.enum';
 import { ProofType, UserAction, UserProof } from 'src/logs/enums/enum';
 import { UtilitiesService } from 'src/utilities/utilities.service';
+import { UserService } from 'src/user/user.service';
 
 @Injectable()
 export class HabitsService {
@@ -19,7 +20,8 @@ export class HabitsService {
 		@InjectRepository(Log) private readonly logRepository: Repository<Log>,
 		private readonly awsService: AwsService,
 		private readonly connection: DataSource,
-		private readonly utilitiesService: UtilitiesService
+		private readonly utilitiesService: UtilitiesService,
+		private readonly userService: UserService
 	) { }
 
 	async findAll(id: number) {
@@ -32,11 +34,7 @@ export class HabitsService {
 			.getMany();
 	}
 
-	async create(createHabitDto: CreateHabitDto, id: number) {
-		const user = await this.userRepository.findOneBy({ id })
-
-		if (!user || !user?.isVerified) throw new BadRequestException()
-
+	async create(createHabitDto: CreateHabitDto, user: User) {
 		const startDate = new Date(createHabitDto.start)
 		const endDate = new Date(createHabitDto.end)
 
@@ -77,15 +75,7 @@ export class HabitsService {
 		}
 	}
 
-	async deleteHabit(id: number, userId: number) {
-		const user = await this.userRepository.findOneBy({ id: userId })
-		if (!user || !user?.isVerified) throw new BadRequestException()
-
-		const habit = await this.habitRepository.findOne({ where: { id }, relations: ['user'] })
-		if (!habit) throw new BadRequestException()
-		if (habit.user.id !== user.id) throw new UnauthorizedException()
-
-
+	async deleteHabit(habit: Habit, user: User) {
 		if (habit.status === RoutineStatus.InProgress) {
 			const queryRunner = this.connection.createQueryRunner()
 			await queryRunner.connect()
@@ -145,14 +135,7 @@ export class HabitsService {
 		}
 	}
 
-	async updateHabitLog(updateHabitDto: UpdateHabitDto, id: number, userId: number) {
-		const user = await this.userRepository.findOneBy({ id: userId })
-		if (!user || !user?.isVerified) throw new BadRequestException()
-
-		const habit = await this.habitRepository.findOne({ where: { id }, relations: ['user'] })
-		if (!habit) throw new BadRequestException()
-		if (habit.user.id !== user.id) throw new UnauthorizedException()
-
+	async updateHabitLog(updateHabitDto: UpdateHabitDto, habit: Habit, user: User) {
 		if (!this.utilitiesService.isMoreThanTimeApart(habit.lastTouch, 86400000)) {
 			throw new BadRequestException(`Next update must be submitted after 24 hours`)
 		}
@@ -169,8 +152,8 @@ export class HabitsService {
 		};
 
 		if (updateHabitDto.proofType === ProofType.Link) {
-			if (!await this.utilitiesService.isValidImageLink(updateHabitDto.proof)) {
-				throw new BadRequestException(`Url must a must a reference to an image.`)
+			if (!await this.utilitiesService.isValidUrl(updateHabitDto.proof)) {
+				throw new BadRequestException(`Url must be valid`)
 			}
 			newLogData.proofType = ProofType.Link
 			newLogData.proof = updateHabitDto.proof
@@ -202,6 +185,14 @@ export class HabitsService {
 		}
 	}
 
+	async findHabitAndCheckOwnership(user: User, id: number) {
+		const habit = await this.habitRepository.findOne({ where: { id }, relations: ['user'] })
+		if (!habit) throw new BadRequestException()
+		if (habit.user.id !== user.id) throw new UnauthorizedException(`This object doesn't belong this user.`)
+
+		return habit
+	}
+
 	async generateInitialData(userId: number) {
 		const user = await this.userRepository.findOneBy({ id: userId })
 
@@ -212,6 +203,10 @@ export class HabitsService {
 		await queryRunner.startTransaction()
 
 		const startTime = new Date()
+		const firstTimestamp = new Date(startTime.getTime() - 300);
+		const secondTimestamp = new Date(startTime.getTime() - 200);
+		const thirdTimestamp = new Date(startTime.getTime() - 100);
+		const fourthTimestamp = new Date(startTime.getTime());
 
 		try {
 			const draft = this.habitRepository.create({
@@ -231,6 +226,7 @@ export class HabitsService {
 				action: UserAction.Create,
 				proof: UserProof.UserConfirmation,
 				proofType: ProofType.Text,
+				createdAt: firstTimestamp
 			};
 
 			savedItem.streak = 0
@@ -243,7 +239,8 @@ export class HabitsService {
 				action: UserAction.Update,
 				proof: UserProof.UserConfirmation,
 				proofType: ProofType.Text,
-				note: "You can also add additional note for context"
+				note: "You can also add additional note for context",
+				createdAt: secondTimestamp
 			};
 
 			savedItem.streak = 1
@@ -255,9 +252,10 @@ export class HabitsService {
 				user,
 				habits: [savedItem],
 				action: UserAction.Update,
-				proof: "https://nestjs.com/",
+				proof: "https://github.com/MichaelMoros/nestjs-demo-app",
 				proofType: ProofType.Link,
-				note: "You can use link as proof to reference online material such as blogs or post elsewhere"
+				note: "You can use link as proof to reference online material such as blogs or post elsewhere",
+				createdAt: thirdTimestamp
 			};
 
 			savedItem.streak = 2
@@ -270,7 +268,8 @@ export class HabitsService {
 				action: UserAction.Update,
 				proof: "https://nestjs-app.s3.ap-southeast-1.amazonaws.com/default.jpg",
 				proofType: ProofType.Image,
-				note: "You can also upload images per routine, and image per log"
+				note: "You can also upload images per routine, and image per log",
+				createdAt: fourthTimestamp
 			};
 
 			savedItem.streak = 3

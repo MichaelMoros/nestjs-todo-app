@@ -17,7 +17,7 @@ import { EndSessionDto } from "./dto/end-session.dto"
 import { ResetPasswordDto } from "./dto/reset-password.dto"
 import { ForgotPasswordDto } from "./dto/forgot-password.dto"
 import { UserService } from "src/user/user.service"
-import { InvalidatedRefreshTokenError } from "src/redis/interfaces/TokenException.interface"
+import { InvalidatedRefreshTokenError, InvalidatedResetPasswordTokenError } from "src/redis/interfaces/TokenException.interface"
 import { VerificationTokenData } from "../interfaces/verification-token-data.interface"
 import { ResetPasswordTokenData } from "../interfaces/reset-password-token-data.interface"
 
@@ -46,7 +46,7 @@ export class AuthenticationService {
 			if (err.code === pgUniqueErrorCode) {
 				throw new ConflictException()
 			} else {
-				throw new InternalServerErrorException("An unexpected error occurred. Please try again later.")
+				throw new InternalServerErrorException(err.message)
 			}
 		}
 	}
@@ -126,7 +126,7 @@ export class AuthenticationService {
 			return this.generateAccessAndRefreshToken(user)
 		} catch (err) {
 			if (err instanceof InvalidatedRefreshTokenError) {
-				throw new UnauthorizedException('Access denied')
+				throw new UnauthorizedException('Invalidated refresh tokens')
 			} else {
 				throw new UnauthorizedException(err.message)
 			}
@@ -248,10 +248,10 @@ export class AuthenticationService {
 			await this.redisService.validateResetPasswordToken(decodedToken.email, decodedToken.resetPasswordTokenId)
 			return { success: true }
 		} catch (e) {
-			if (e instanceof TokenExpiredError || e instanceof JsonWebTokenError || e instanceof InvalidatedRefreshTokenError) {
+			if (e instanceof TokenExpiredError || e instanceof JsonWebTokenError || e instanceof InvalidatedResetPasswordTokenError) {
 				throw new UnauthorizedException(e.message)
 			} else {
-				throw new InternalServerErrorException("An unexpected error occurred. Please try again later.")
+				throw new InternalServerErrorException(e.message)
 			}
 		}
 	}
@@ -261,18 +261,19 @@ export class AuthenticationService {
 			const decodedToken: Partial<ResetPasswordTokenData> = await this.verifySignedToken(token, this.jwtConfiguration.resetPasswordSecret)
 
 			const user = await this.userRepository.findOneBy({ email: decodedToken.email })
-
 			if (!user) throw new BadRequestException("User not found")
+
+			await this.redisService.validateResetPasswordToken(decodedToken.email, decodedToken.resetPasswordTokenId)
 
 			const hashedPassword = await this.hashingService.hash(forgotPasswordDto.password)
 			user.password = hashedPassword
 			await this.userRepository.save(user)
 			await this.redisService.invalidateResetPasswordToken(decodedToken.email)
 		} catch (e) {
-			if (e instanceof TokenExpiredError || e instanceof JsonWebTokenError || e instanceof InvalidatedRefreshTokenError) {
+			if (e instanceof TokenExpiredError || e instanceof JsonWebTokenError || e instanceof InvalidatedResetPasswordTokenError) {
 				throw new UnauthorizedException(e.message)
 			} else {
-				throw new InternalServerErrorException("An unexpected error occurred. Please try again later.")
+				throw new InternalServerErrorException(e.message)
 			}
 		}
 	}

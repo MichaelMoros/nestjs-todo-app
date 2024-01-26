@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Res, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Res, UseInterceptors, UploadedFile, ForbiddenException, UseFilters, InternalServerErrorException } from '@nestjs/common';
 import { UserService } from './user.service';
 import { AuthType } from 'src/iam/authentication/enums/auth-type.enum';
 import { Auth } from 'src/iam/authentication/decorators/auth.decorator';

@@ -18,7 +18,6 @@ export class AccessTokenGuard implements CanActivate {
 		const request = context.switchToHttp().getRequest()
 		const accessToken = request.cookies['accessToken']
 
-		console.log({ accessToken }, "from AT guard")
 		if (!accessToken) throw new UnauthorizedException()
 
 		try {

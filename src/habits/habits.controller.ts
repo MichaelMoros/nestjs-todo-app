@@ -1,10 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UploadedFile, Res, UseInterceptors, ParseFilePipe, UsePipes, Put, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, UploadedFile, Res, UseInterceptors } from '@nestjs/common';
 import { HabitsService } from './habits.service';
 import { CreateHabitDto } from './dto/create-habit.dto';
 import { UpdateHabitDto } from './dto/update-habit.dto';
 import { Auth } from 'src/iam/authentication/decorators/auth.decorator';
 import { AuthType } from 'src/iam/authentication/enums/auth-type.enum';
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { GenericValidationPipe } from './pipe/ValidationPipe';
 import { FileSizeRule } from './validators/file-size.validation.rule';
@@ -33,21 +33,23 @@ export class HabitsController {
 	}
 
 	@Post()
-	create(@Body() createHabitDto: CreateHabitDto, @ActiveUser() user: ActiveUserData) {
-		return this.habitsService.create(createHabitDto, user.sub);
+	async create(@Body() createHabitDto: CreateHabitDto, @ActiveUser() activeUser: ActiveUserData) {
+		const user = await this.userService.verifyUser({ id: activeUser.sub })
+		return this.habitsService.create(createHabitDto, user);
 	}
 
 	@Delete(':id')
-	updateHabit(@Param('id') id: string, @ActiveUser() user: ActiveUserData) {
-		return this.habitsService.deleteHabit(+id, user.sub)
+	async updateHabit(@Param('id') id: string, @ActiveUser() activeUser: ActiveUserData) {
+		const user = await this.userService.verifyUser({ id: activeUser.sub })
+		const habit = await this.habitsService.findHabitAndCheckOwnership(user, +id)
+		return this.habitsService.deleteHabit(habit, user)
 	}
 
 	@Post(':id')
 	@UseInterceptors(FileInterceptor('file'))
 	async uploadFile(
-		@ActiveUser() user: ActiveUserData,
+		@ActiveUser() activeUser: ActiveUserData,
 		@Param('id') id: string,
-		@Res() res: Response,
 		@Body() updateHabitDto: UpdateHabitDto,
 		@UploadedFile(
 			new GenericValidationPipe([
@@ -57,12 +59,14 @@ export class HabitsController {
 		) file: Express.Multer.File
 	) {
 
+		const user = await this.userService.verifyUser({ id: activeUser.sub })
+		const habit = await this.habitsService.findHabitAndCheckOwnership(user, +id)
+
 		const updateHabitDtoWithFile = {
 			...updateHabitDto,
 			file
 		}
 
-		await this.habitsService.updateHabitLog(updateHabitDtoWithFile, +id, user.sub)
-		return res.status(200).json({ success: true })
+		return await this.habitsService.updateHabitLog(updateHabitDtoWithFile, habit, user)
 	}
 }

@@ -38,17 +38,17 @@ export class UserService {
 						await this.awsService.deleteObjects(oldObjectKey)
 					} catch (deleteError) {
 						if (deleteError instanceof S3DeleteObjectsException) {
-							throw new InternalServerErrorException("An error occured while deleting your old avatar")
+							throw new InternalServerErrorException(deleteError.message)
 						} else {
-							throw new InternalServerErrorException('An unexpected error occurred. Please try again later.');
+							throw new InternalServerErrorException(deleteError.message);
 						}
 					}
 				}
 			} catch (error) {
 				if (error instanceof S3UploadException) {
-					throw new InternalServerErrorException("An error occured while uploading your avatar. Please try again later.")
+					throw new InternalServerErrorException(error.message)
 				} else {
-					throw new InternalServerErrorException('An unexpected error occurred. Please try again later.');
+					throw new InternalServerErrorException(error.message);
 				}
 			}
 		}

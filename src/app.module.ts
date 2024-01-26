@@ -12,6 +12,8 @@ import { UtilitiesModule } from './utilities/utilities.module';
 import { HttpModule } from '@nestjs/axios';
 import { LoggerModule } from './logger/logger.module';
 import { NodemailerModule } from './nodemailer/nodemailer.module';
+import { APP_FILTER } from '@nestjs/core';
+import { HttpExceptionFilter } from './filter/http-exception.filter';
 
 @Module({
 	imports: [
@@ -29,6 +31,13 @@ import { NodemailerModule } from './nodemailer/nodemailer.module';
 		LoggerModule,
 		NodemailerModule
 	],
-	controllers: [AppController]
+	controllers: [AppController],
+	providers: [
+		{
+			provide: APP_FILTER,
+			useClass: HttpExceptionFilter
+		}
+	]
 })
+
 export class AppModule { }

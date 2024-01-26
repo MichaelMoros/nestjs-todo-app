@@ -9,7 +9,6 @@ import { AwsService } from 'src/aws/aws.service';
 import { UtilitiesModule } from 'src/utilities/utilities.module';
 import { HttpModule } from '@nestjs/axios';
 import { UtilitiesService } from 'src/utilities/utilities.service';
-import { UserService } from 'src/user/user.service';
 import { UserModule } from 'src/user/user.module';
 
 @Module({
